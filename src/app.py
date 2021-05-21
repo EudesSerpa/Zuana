@@ -4,6 +4,7 @@ from tkinter import messagebox
 from functools import partial
 from PIL import ImageTk, Image
 import mysql.connector as mysql
+from datetime import datetime, timedelta
 import config_bd
 import DateFormat
 import LogicaNegocio
@@ -90,7 +91,6 @@ class MainWindow():
         self.lastName = tk.StringVar() 
         self.secondSurname = tk.StringVar()
         self.cc = tk.StringVar(value='')
-        # self.cc = tk.IntVar(value='')
         self.phone = tk.StringVar()
         self.email = tk.StringVar()
         self.points = tk.IntVar(value='')
@@ -143,32 +143,49 @@ class MainWindow():
                 response = dato.fetchmany(size=1)[0] #Retorna una lista de tuplas, se toma la pos 0 para asignar la tupla
             
             cedula = response[0]
+            #Existe Cliente
             if (cedula != None): 
-                #Existe
                 self.cedula.delete(0, 'end')
 
-                #Verificar si el cliente no tiene puntos previos
-                oldPoints = response[6]
-                if (oldPoints == None):
+                lastPurchaseDate = response[6]
+                #Primera compra
+                if (lastPurchaseDate == None):
                     oldPoints = (0, )
-
-                    data = response[:6] + oldPoints
-                    self.showInfo(data=data)
+                #nth's compras
                 else:
-                    self.showInfo(data=response)
+                    vigente = self.dateCompare(lastPurchaseDate)
+                    if (vigente):
+                        #Consultamos puntos
+                        oldPoints = self.querysBD(query='select', destination='points', parametros=(cedula, ))
+                        for dato in oldPoints:
+                            oldPoints = dato.fetchone()
+                    else:
+                        #Actualizamos el estado para especificar el vencimiento de los puntos
+                        check = self.querysBD(query='insert', destination='vigencia', parametros=(cedula, ))
+                        oldPoints = (0, )
+                
+                data = response[:6] + oldPoints
+                self.showInfo(data=data)
 
                 self.buttonAccion.config(state='normal')
+            #No existe Cliente
             else: 
-                #No existe
                 self.showInfo(data=('','','','','','',''))
                 self.buttonAccion.config(state='disabled')
                 self.notificationWindow(parent=self.consultClient, type='error', title='Cliente inexistente', text='Por favor, valide la información o registre al cliente.')
         except Exception as e:
-            print(e)
+            #print(e)
             self.buttonAccion.config(state='disabled')
             self.cedula.delete(0, 'end')
             self.showInfo(data=('','','','','','',''))
             self.notificationWindow(parent=self.consultClient, type='error', title='Cédula inválida', text='Por favor, ingrese una CC válida.')
+
+    def dateCompare(self, lastPurchaseDate):
+        #Comprobar vigencia
+        vigencia = 30
+        dateCurrent = datetime.strptime(self.dateCurrent(), "%Y-%m-%d %X")
+        minDateValid = dateCurrent - timedelta(days=vigencia)
+        return True if(lastPurchaseDate >= minDateValid) else False
 
     def showInfo(self, data=()):
         self.cc.set(data[0])
@@ -275,6 +292,8 @@ class MainWindow():
 
             tk.Label(self.pointWindow, text='POR FAVOR, VALIDE LA INFORMACIÓN A FACTURAR', font=self.styles()).grid(row=0, column=0, pady=(10, 0))
 
+            self.pointsToAssign = tk.IntVar(value=self.pointsPerPurchase())
+
             #Frames
             #---Frames
             frameGlobal = tk.LabelFrame(self.pointWindow, text='')
@@ -290,7 +309,7 @@ class MainWindow():
             tk.Label(frameData, text=f'{int(self.totalSaleVar.get())}', font=self.styles(pSize=14)).grid(row=1, column=1, pady=(15, 0), padx=(0, 20))
             
             tk.Label(frameData, text='Puntos a asignar: ', font=self.styles()).grid(row=2, column=0, pady=(15,0), padx=(0, 10), sticky='e')
-            tk.Label(frameData, text=f'{self.pointsPerPurchase()}',font=self.styles(pSize=14, pWeight='bold')).grid(row=2, column=1, pady=(15, 0), padx=(0, 20))
+            tk.Label(frameData, textvariable=self.pointsToAssign, font=self.styles(pSize=14, pWeight='bold')).grid(row=2, column=1, pady=(15, 0), padx=(0, 20))
             #Options Buttons 
             frameButtons = tk.Frame(frameGlobal)
             frameButtons.grid(row=1, column=0, columnspan=2, pady=(10, 20), padx=(50,30))
@@ -304,7 +323,7 @@ class MainWindow():
         clientId = self.cc.get()
         numberBill = self.billNumberVar.get()
         totalSale = self.totalSaleVar.get()
-        points = self.pointsPerPurchase()
+        points = self.pointsToAssign.get()
         date = self.dateCurrent()
 
         parametros = (clientId, numberBill, totalSale, points, date)
@@ -459,18 +478,23 @@ class MainWindow():
 
             if (query == 'select'):
                 if (destination == 'clients'):
-                    # cursor.callproc('info_client_factura', parametros)
-                    cursor.callproc('tra_consult', parametros)
+                    cursor.callproc('consultExistence', parametros)
+                    response = cursor.stored_results()
+                elif (destination == 'points'):
+                    cursor.callproc('pointsClient', parametros)
                     response = cursor.stored_results()
                 else: 
                     cursor.callproc('info_servicios')
                     response = cursor.stored_results()
-            else: #Inserts 
+            else: #Inserts / update
                 if (destination == 'redemptions'):
-                    cursor.callproc('new_rendencion', parametros)
+                    cursor.callproc('insertCanje', parametros)
+                    response = None
+                elif (destination == 'vigencia'):
+                    cursor.callproc('updateVigencia', parametros)
                     response = None
                 elif (destination == 'sales'):
-                    cursor.callproc('infoventa_factura', parametros)
+                    cursor.callproc('insertDataBilled', parametros)
                     response = None
                 else:
                     cursor.callproc('create_client', parametros)
