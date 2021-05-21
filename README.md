@@ -25,7 +25,7 @@ Zuana/Zuana-master --> APP -> dist -> AppZuana -> AppZuana.exe.
 Este último es el ejecutable del aplicativo. Puede ejecutarlo directamente.
 
 ## Tener en cuenta
-* El aplicativo está disponible para usar solo en S.O Windows 10 Home.
+* El aplicativo está disponible para usar solo en S.O Windows.
 * Para el correcto funcionamiento del sistema, debe contar con el Gestor de base de datos MySQL. Remítase a la sección de -Base de datos-.
 
 
