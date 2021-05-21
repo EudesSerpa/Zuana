@@ -1,0 +1,13 @@
+Hola, {nombreCliente}.
+
+Has realizado el canje del servicio {nombreServicio} en tu Zupermercado. 
+Con este canje has redimido: {puntosAR} puntos.
+
+Actualmente cuentas con {puntosTotales} puntos. 
+
+Recuerda que tus puntos tienen una vigencia de 1 mes. ¡Aprovechalos! En tu Zupermercado apreciamos y compensamos tu lealtad. 
+¡Gracias por preferirnos!
+
+Te deseamos un feliz día (●'◡'●).
+
+Fecha del canje: {fechaCompra}.
